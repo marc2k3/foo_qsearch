@@ -1,6 +1,7 @@
 #define _WIN32_WINNT _WIN32_WINNT_WIN7
 #define WINVER _WIN32_WINNT_WIN7
 
+#include <array>
 #include <SDK/foobar2000.h>
 
 static constexpr const char* component_name = "QSearch";
@@ -32,34 +33,14 @@ DECLARE_COMPONENT_VERSION(
 
 VALIDATE_COMPONENT_FILENAME("foo_qsearch.dll");
 
-titleformat_object_ptr g_artist_obj, g_title_obj, g_album_obj;
-
-class InitQuit : public initquit
+static constexpr std::array context_guids =
 {
-	void on_quit() final
-	{
-		g_artist_obj.release();
-		g_title_obj.release();
-		g_album_obj.release();
-	}
-};
-
-FB2K_SERVICE_FACTORY(InitQuit);
-
-struct ContextItem
-{
-	const GUID* guid;
-	const pfc::string8 name;
-};
-
-static const std::vector<ContextItem> context_items =
-{
-	{ &guid_context_artist_is, "artist IS" },
-	{ &guid_context_title_is, "title IS" },
-	{ &guid_context_album_is, "album IS" },
-	{ &guid_context_artist_has, "artist HAS" },
-	{ &guid_context_title_has, "title HAS" },
-	{ &guid_context_album_has, "album HAS" },
+	&guid_context_artist_is,
+	&guid_context_title_is,
+	&guid_context_album_is,
+	&guid_context_artist_has,
+	&guid_context_title_has,
+	&guid_context_album_has,
 };
 
 class ContextMenu : public contextmenu_item_simple
@@ -67,9 +48,9 @@ class ContextMenu : public contextmenu_item_simple
 public:
 	GUID get_item_guid(uint32_t index) final
 	{
-		if (index >= context_items.size()) FB2K_BugCheck();
+		if (index >= context_guids.size()) FB2K_BugCheck();
 
-		return *context_items[index].guid;
+		return *context_guids[index];
 	}
 
 	GUID get_parent() final
@@ -79,7 +60,7 @@ public:
 
 	bool context_get_display(uint32_t index, metadb_handle_list_cref handles, pfc::string_base& out, uint32_t&, const GUID&) final
 	{
-		if (index >= context_items.size()) FB2K_BugCheck();
+		if (index >= context_guids.size()) FB2K_BugCheck();
 
 		get_item_name(index, out);
 		return handles.get_count() == 1;
@@ -87,7 +68,7 @@ public:
 
 	bool get_item_description(uint32_t index, pfc::string_base& out) final
 	{
-		if (index >= context_items.size()) FB2K_BugCheck();
+		if (index >= context_guids.size()) FB2K_BugCheck();
 
 		get_item_name(index, out);
 		return true;
@@ -95,62 +76,23 @@ public:
 
 	uint32_t get_num_items() final
 	{
-		return static_cast<uint32_t>(context_items.size());
+		return static_cast<uint32_t>(context_guids.size());
 	}
 
 	void context_command(uint32_t index, metadb_handle_list_cref handles, const GUID&) final
 	{
-		if (index >= context_items.size()) FB2K_BugCheck();
+		if (index >= context_guids.size()) FB2K_BugCheck();
 		if (handles.get_count() != 1) return;
 
-		pfc::string8 field, what;
-
-		switch (index)
-		{
-		case 0:
-		case 3:
-		{
-			if (g_artist_obj.is_empty())
-			{
-				titleformat_compiler::get()->compile_safe(g_artist_obj, "[%artist%]");
-			}
-			field = "artist";
-			what = get_tf_string(g_artist_obj, handles[0]);
-		}
-		break;
-		case 1:
-		case 4:
-		{
-			if (g_title_obj.is_empty())
-			{
-				titleformat_compiler::get()->compile_safe(g_title_obj, "[%title%]");
-			}
-			field = "title";
-			what = get_tf_string(g_title_obj, handles[0]);
-		}
-		break;
-		case 2:
-		case 5:
-		{
-			if (g_album_obj.is_empty())
-			{
-				titleformat_compiler::get()->compile_safe(g_album_obj, "[%album%]");
-			}
-			field = "album";
-			what = get_tf_string(g_album_obj, handles[0]);
-		}
-		break;
-		}
-
+		const pfc::string8 field = prefix(index);
+		const pfc::string8 what = get_tf(field, handles[0]);
 		if (what.is_empty())
 		{
 			FB2K_console_print(component_name, ": Not searching. ", field, " was not set or empty.");
 			return;
 		}
 
-		search_filter_v2::ptr filter;
-		const bool is = index < 3;
-		const pfc::string8 query = field + (is ? " IS " : " HAS ") + what.toLower();
+		const pfc::string8 query = pfc::format(field, " ", join(index), " ", what);
 
 		if (g_advconfig_search_window.get())
 		{
@@ -158,10 +100,18 @@ public:
 		}
 		else
 		{
+			search_filter_v2::ptr filter;
+
 			try
 			{
+				filter = search_filter_manager_v2::get()->create_ex(query, fb2k::service_new<completion_notify_dummy>(), search_filter_manager_v2::KFlagSuppressNotify);
+			}
+			catch (...) {}
+
+			if (filter.is_valid())
+			{
 				auto plm = playlist_manager::get();
-				const size_t playlist = plm->create_playlist(what, what.get_length(), SIZE_MAX);
+				const size_t playlist = plm->create_playlist(query, query.get_length(), SIZE_MAX);
 				autoplaylist_manager::get()->add_client_simple(query, "", playlist, 0);
 
 				if (g_advconfig_autoplaylist_switch.get())
@@ -169,29 +119,27 @@ public:
 					plm->set_active_playlist(playlist);
 				}
 			}
-			catch (...) {}
 		}
 	}
 
 	void get_item_name(uint32_t index, pfc::string_base& out) final
 	{
-		if (index >= context_items.size()) FB2K_BugCheck();
+		if (index >= context_guids.size()) FB2K_BugCheck();
 
-		out = context_items[index].name;
+		out = pfc::format(prefix(index), " ", join(index));
 	}
 
 private:
-	pfc::string8 get_tf_string(const titleformat_object_ptr& obj, const metadb_handle_ptr& handle)
+	pfc::string8 get_tf(const char* field, const metadb_handle_ptr& handle)
 	{
-		bool is_playing_handle{};
-		metadb_handle_ptr np;
-		if (playback_control::get()->get_now_playing(np))
-		{
-			is_playing_handle = np->get_location() == handle->get_location();
-		}
+		const pfc::string8 pattern = pfc::format("[%", field, "%]");
+		titleformat_object_ptr obj;
+		titleformat_compiler::get()->compile_safe(obj, pattern);
 
+		metadb_handle_ptr np;
 		pfc::string8 ret;
-		if (is_playing_handle)
+
+		if (playback_control::get()->get_now_playing(np) && np->get_location() == handle->get_location())
 		{
 			playback_control::get()->playback_format_title(nullptr, ret, obj, nullptr, playback_control::display_level_all);
 		}
@@ -200,6 +148,19 @@ private:
 			handle->format_title(nullptr, ret, obj, nullptr);
 		}
 		return ret;
+	}
+
+	pfc::string8 join(uint32_t index)
+	{
+		return index < 3 ? "IS" : "HAS";
+	}
+
+	pfc::string8 prefix(uint32_t index)
+	{
+		if (index == 0 || index == 3) return "artist";
+		if (index == 1 || index == 4) return "title";
+		if (index == 2 || index == 5) return "album";
+		return "";
 	}
 };
 
