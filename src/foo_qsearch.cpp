@@ -92,7 +92,7 @@ public:
 			return;
 		}
 
-		const pfc::string8 query = pfc::format(field, " ", join(index), " ", what);
+		const pfc::string8 query = pfc::format(field, " ", join(index), " ", what.toLower());
 
 		if (g_advconfig_search_window.get() || IsKeyPressed(VK_SHIFT))
 		{
@@ -100,7 +100,7 @@ public:
 		}
 		else
 		{
-			create_autoplaylist(query);
+			create_autoplaylist(what, query);
 		}
 	}
 
@@ -156,12 +156,12 @@ private:
 		return index < 3 ? "IS" : "HAS";
 	}
 
-	void create_autoplaylist(const char* query)
+	void create_autoplaylist(const char* name, const char* query)
 	{
 		if (!check_query(query)) return;
 
 		auto plm = playlist_manager::get();
-		const size_t playlist = plm->create_playlist(query, strlen(query), SIZE_MAX);
+		const size_t playlist = plm->create_playlist(name, strlen(name), SIZE_MAX);
 		autoplaylist_manager::get()->add_client_simple(query, "", playlist, 0);
 
 		if (g_advconfig_autoplaylist_switch.get())
