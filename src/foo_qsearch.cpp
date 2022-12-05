@@ -136,12 +136,13 @@ private:
 		titleformat_object_ptr obj;
 		titleformat_compiler::get()->compile_safe(obj, pattern);
 
+		auto pc = playback_control::get();
 		metadb_handle_ptr np;
 		pfc::string8 ret;
 
-		if (playback_control::get()->get_now_playing(np) && np->get_location() == handle->get_location())
+		if (pc->get_now_playing(np) && np->get_location() == handle->get_location())
 		{
-			playback_control::get()->playback_format_title(nullptr, ret, obj, nullptr, playback_control::display_level_all);
+			pc->playback_format_title(nullptr, ret, obj, nullptr, playback_control::display_level_all);
 		}
 		else
 		{
