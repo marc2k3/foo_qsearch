@@ -94,7 +94,7 @@ public:
 
 		const pfc::string8 query = pfc::format(field, " ", join(index), " ", what);
 
-		if (g_advconfig_search_window.get())
+		if (g_advconfig_search_window.get() || IsKeyPressed(VK_SHIFT))
 		{
 			library_search_ui::get()->show(query);
 		}
