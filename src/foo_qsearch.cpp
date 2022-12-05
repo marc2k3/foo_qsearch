@@ -84,7 +84,7 @@ public:
 		if (index >= context_guids.size()) FB2K_BugCheck();
 		if (handles.get_count() != 1) return;
 
-		const pfc::string8 field = prefix(index);
+		const pfc::string8 field = get_field(index);
 		const pfc::string8 what = get_tf(field, handles[0]);
 		if (what.is_empty())
 		{
@@ -100,25 +100,7 @@ public:
 		}
 		else
 		{
-			search_filter_v2::ptr filter;
-
-			try
-			{
-				filter = search_filter_manager_v2::get()->create_ex(query, fb2k::service_new<completion_notify_dummy>(), search_filter_manager_v2::KFlagSuppressNotify);
-			}
-			catch (...) {}
-
-			if (filter.is_valid())
-			{
-				auto plm = playlist_manager::get();
-				const size_t playlist = plm->create_playlist(query, query.get_length(), SIZE_MAX);
-				autoplaylist_manager::get()->add_client_simple(query, "", playlist, 0);
-
-				if (g_advconfig_autoplaylist_switch.get())
-				{
-					plm->set_active_playlist(playlist);
-				}
-			}
+			create_autoplaylist(query);
 		}
 	}
 
@@ -126,10 +108,28 @@ public:
 	{
 		if (index >= context_guids.size()) FB2K_BugCheck();
 
-		out = pfc::format(prefix(index), " ", join(index));
+		out = pfc::format(get_field(index), " ", join(index));
 	}
 
 private:
+	bool check_query(const char* query)
+	{
+		try
+		{
+			return search_filter_manager_v2::get()->create_ex(query, fb2k::service_new<completion_notify_dummy>(), search_filter_manager_v2::KFlagSuppressNotify).is_valid();
+		}
+		catch (...) {}
+		return false;
+	}
+
+	pfc::string8 get_field(uint32_t index)
+	{
+		if (index == 0 || index == 3) return "artist";
+		if (index == 1 || index == 4) return "title";
+		if (index == 2 || index == 5) return "album";
+		return "";
+	}
+
 	pfc::string8 get_tf(const char* field, const metadb_handle_ptr& handle)
 	{
 		const pfc::string8 pattern = pfc::format("[%", field, "%]");
@@ -156,12 +156,18 @@ private:
 		return index < 3 ? "IS" : "HAS";
 	}
 
-	pfc::string8 prefix(uint32_t index)
+	void create_autoplaylist(const char* query)
 	{
-		if (index == 0 || index == 3) return "artist";
-		if (index == 1 || index == 4) return "title";
-		if (index == 2 || index == 5) return "album";
-		return "";
+		if (!check_query(query)) return;
+
+		auto plm = playlist_manager::get();
+		const size_t playlist = plm->create_playlist(query, strlen(query), SIZE_MAX);
+		autoplaylist_manager::get()->add_client_simple(query, "", playlist, 0);
+
+		if (g_advconfig_autoplaylist_switch.get())
+		{
+			plm->set_active_playlist(playlist);
+		}
 	}
 };
 
