@@ -26,7 +26,7 @@ static advconfig_radio_factory g_advconfig_search_window("Open Media Library sea
 
 DECLARE_COMPONENT_VERSION(
 	component_name,
-	"1.0.3",
+	"1.0.4",
 	"Copyright (C) 2022 marc2003\n\n"
 	"Build: " __TIME__ ", " __DATE__
 );
