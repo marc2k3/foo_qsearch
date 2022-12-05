@@ -20,8 +20,8 @@ static constexpr GUID guid_advconfig_autoplaylist_switch = { 0x9944325d, 0xd4e8,
 static constexpr GUID guid_advconfig_search_window = { 0x525edd00, 0xc292, 0x4704, { 0xb6, 0xb8, 0xe, 0xca, 0x9c, 0xe8, 0x17, 0xb4 } };
 
 static advconfig_branch_factory g_advconfig_branch(component_name, guid_advconfig_branch, advconfig_branch::guid_branch_tools, 0);
-static advconfig_radio_factory g_advconfig_autoplaylist("Create Autoplaylist", guid_advconfig_autoplaylist, guid_advconfig_branch, 0, true);
-static advconfig_radio_factory g_advconfig_autoplaylist_switch("Create Autoplaylist and switch", guid_advconfig_autoplaylist_switch, guid_advconfig_branch, 1, false);
+static advconfig_radio_factory g_advconfig_autoplaylist("Create Autoplaylist", guid_advconfig_autoplaylist, guid_advconfig_branch, 0, false);
+static advconfig_radio_factory g_advconfig_autoplaylist_switch("Create Autoplaylist and switch", guid_advconfig_autoplaylist_switch, guid_advconfig_branch, 1, true);
 static advconfig_radio_factory g_advconfig_search_window("Open Media Library search window", guid_advconfig_search_window, guid_advconfig_branch, 2, false);
 
 DECLARE_COMPONENT_VERSION(
