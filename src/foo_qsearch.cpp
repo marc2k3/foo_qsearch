@@ -17,12 +17,16 @@ static constexpr GUID guid_context_album_has = { 0x66956efb, 0xd24e, 0x4306, { 0
 static constexpr GUID guid_advconfig_branch = { 0x57cd1f9d, 0xb4fc, 0x46a9, { 0xad, 0x34, 0x20, 0x72, 0x39, 0x9c, 0x37, 0xa6 } };
 static constexpr GUID guid_advconfig_autoplaylist = { 0x64b8d088, 0xcfa6, 0x472e, { 0x89, 0x35, 0x2a, 0x8c, 0x9d, 0x56, 0xdd, 0xe2 } };
 static constexpr GUID guid_advconfig_autoplaylist_switch = { 0x9944325d, 0xd4e8, 0x4267, { 0x90, 0xf3, 0xfd, 0x66, 0x1b, 0xad, 0x2c, 0xd1 } };
+static constexpr GUID guid_advconfig_playlist = { 0x5e4eff18, 0xc1a9, 0x44a3, { 0xa6, 0xb0, 0x61, 0x5a, 0xc2, 0xd4, 0x52, 0x5b } };
+static constexpr GUID guid_advconfig_playlist_switch = { 0x925f98ab, 0x7553, 0x4cb7, { 0x9f, 0xa5, 0x98, 0xca, 0x7e, 0x16, 0x20, 0xd6 } };
 static constexpr GUID guid_advconfig_search_window = { 0x525edd00, 0xc292, 0x4704, { 0xb6, 0xb8, 0xe, 0xca, 0x9c, 0xe8, 0x17, 0xb4 } };
 
 static advconfig_branch_factory g_advconfig_branch(component_name, guid_advconfig_branch, advconfig_branch::guid_branch_tools, 0);
 static advconfig_radio_factory g_advconfig_autoplaylist("Create Autoplaylist", guid_advconfig_autoplaylist, guid_advconfig_branch, 0, false);
 static advconfig_radio_factory g_advconfig_autoplaylist_switch("Create Autoplaylist and switch", guid_advconfig_autoplaylist_switch, guid_advconfig_branch, 1, true);
-static advconfig_radio_factory g_advconfig_search_window("Open Media Library search window", guid_advconfig_search_window, guid_advconfig_branch, 2, false);
+static advconfig_radio_factory g_advconfig_playlist("Send search results to standard playlist", guid_advconfig_playlist, guid_advconfig_branch, 2, false);
+static advconfig_radio_factory g_advconfig_playlist_switch("Send search results to standard playlist and switch", guid_advconfig_playlist_switch, guid_advconfig_branch, 3, false);
+static advconfig_radio_factory g_advconfig_search_window("Open Media Library search window", guid_advconfig_search_window, guid_advconfig_branch, 4, false);
 
 DECLARE_COMPONENT_VERSION(
 	component_name,
@@ -100,7 +104,8 @@ public:
 		}
 		else
 		{
-			create_autoplaylist(what, query);
+			const bool autoplaylist = g_advconfig_autoplaylist.get() || g_advconfig_autoplaylist_switch.get();
+			create_playlist(what, query, autoplaylist);
 		}
 	}
 
@@ -112,15 +117,6 @@ public:
 	}
 
 private:
-	bool check_query(const char* query)
-	{
-		try
-		{
-			return search_filter_manager_v2::get()->create_ex(query, fb2k::service_new<completion_notify_dummy>(), search_filter_manager_v2::KFlagSuppressNotify).is_valid();
-		}
-		catch (...) {}
-		return false;
-	}
 
 	pfc::string8 get_field(uint32_t index)
 	{
@@ -156,15 +152,42 @@ private:
 		return index < 3 ? "IS" : "HAS";
 	}
 
-	void create_autoplaylist(const char* name, const char* query)
+	void create_playlist(const char* name, const char* query, bool autoplaylist)
 	{
-		if (!check_query(query)) return;
+		search_filter_v2::ptr filter;
+
+		try
+		{
+			filter = search_filter_manager_v2::get()->create_ex(query, fb2k::service_new<completion_notify_dummy>(), search_filter_manager_v2::KFlagSuppressNotify);
+		}
+		catch (...) {}
+
+		if (filter.is_empty()) return;
 
 		auto plm = playlist_manager::get();
 		const size_t playlist = plm->create_playlist(name, strlen(name), SIZE_MAX);
-		autoplaylist_manager::get()->add_client_simple(query, "", playlist, 0);
 
-		if (g_advconfig_autoplaylist_switch.get())
+		if (autoplaylist)
+		{
+			autoplaylist_manager::get()->add_client_simple(query, "", playlist, 0);
+		}
+		else
+		{
+			fb2k::arrayRef arr;
+
+			try
+			{
+				arr = library_index::get()->search(filter, 0, fb2k::noAbort);
+			}
+			catch (...) {}
+
+			if (arr.is_valid())
+			{
+				plm->playlist_insert_items(playlist, 0, arr->as_list_of<metadb_handle>(), pfc::bit_array_false());
+			}
+		}
+
+		if (g_advconfig_autoplaylist_switch.get() || g_advconfig_playlist_switch.get())
 		{
 			plm->set_active_playlist(playlist);
 		}
