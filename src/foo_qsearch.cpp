@@ -117,7 +117,6 @@ public:
 	}
 
 private:
-
 	pfc::string8 get_field(uint32_t index)
 	{
 		if (index == 0 || index == 3) return "artist";
@@ -164,32 +163,26 @@ private:
 
 		if (filter.is_empty()) return;
 
-		auto plm = playlist_manager::get();
-		const size_t playlist = plm->create_playlist(name, strlen(name), SIZE_MAX);
+		auto plman = playlist_manager::get();
+		const size_t playlistIndex = plman->create_playlist(name, strlen(name), SIZE_MAX);
 
 		if (autoplaylist)
 		{
-			autoplaylist_manager::get()->add_client_simple(query, "", playlist, 0);
+			autoplaylist_manager::get()->add_client_simple(query, "", playlistIndex, 0);
 		}
 		else
 		{
-			fb2k::arrayRef arr;
-
 			try
 			{
-				arr = library_index::get()->search(filter, 0, fb2k::noAbort);
+				auto arr = library_index::get()->search(filter, 0, fb2k::noAbort);
+				plman->playlist_insert_items(playlistIndex, 0, arr->as_list_of<metadb_handle>(), pfc::bit_array_false());
 			}
 			catch (...) {}
-
-			if (arr.is_valid())
-			{
-				plm->playlist_insert_items(playlist, 0, arr->as_list_of<metadb_handle>(), pfc::bit_array_false());
-			}
 		}
 
 		if (g_advconfig_autoplaylist_switch.get() || g_advconfig_playlist_switch.get())
 		{
-			plm->set_active_playlist(playlist);
+			plman->set_active_playlist(playlistIndex);
 		}
 	}
 };
