@@ -104,8 +104,7 @@ public:
 		}
 		else
 		{
-			const bool autoplaylist = g_advconfig_autoplaylist.get() || g_advconfig_autoplaylist_switch.get();
-			create_playlist(what, query, autoplaylist);
+			create_playlist(what, query);
 		}
 	}
 
@@ -151,7 +150,7 @@ private:
 		return index < 3 ? "IS" : "HAS";
 	}
 
-	void create_playlist(const char* name, const char* query, bool autoplaylist)
+	void create_playlist(const char* name, const char* query)
 	{
 		search_filter_v2::ptr filter;
 
@@ -166,7 +165,7 @@ private:
 		auto plman = playlist_manager::get();
 		const size_t playlistIndex = plman->create_playlist(name, strlen(name), SIZE_MAX);
 
-		if (autoplaylist)
+		if (g_advconfig_autoplaylist.get() || g_advconfig_autoplaylist_switch.get())
 		{
 			autoplaylist_manager::get()->add_client_simple(query, "", playlistIndex, 0);
 		}
